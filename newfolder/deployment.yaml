@@ -1,0 +1,77 @@
+#Deployment
+###controllers/pb-deploy.tml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkinsdeployment
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+  minReadySeconds: 5
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: jenkinspod
+  template:
+    metadata:
+      labels:
+        app: jenkinspod
+    spec:
+      containers:
+      - name: jenkins-container
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            cpu: '1'
+            memory: '500Mi'
+          requests:
+            cpu: '1'
+            memory: '500Mi'
+        securityContext:
+          runAsUser: 0
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+          - name: jenkins-data-storage
+            mountPath: /var/jenkins_home
+      volumes:
+        - name: jenkins-data-storage
+          persistentVolumeClaim:
+              claimName: jenkins-data-claim
+
+      imagePullSecrets:
+      - name: acr-auth
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jenkins-data-volume
+  labels:
+    type: local
+spec:
+  storageClassName: default
+  capacity:
+    storage: 4Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data"
+
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jenkins-data-claim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: default
+  resources:
+    requests:
+      storage: 4Gi
